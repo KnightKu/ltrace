@@ -98,6 +98,16 @@ def main():
 
     traceFile.close()
 
+    if not sched_lists:
+        print '*' * 10
+        print 'Error:', 'Empty trace'
+        print '*' * 10
+        sys.exit(1)
+
+    g_duration = timestamp2ms(sched_lists[-1]['timestamp']) - timestamp2ms(
+        sched_lists[0]['timestamp'])
+    g_duration = float(g_duration / 1000000.0)
+
     unmatched_sched = []
     thread_sched = []
     for sched in sched_lists:
@@ -146,15 +156,28 @@ def main():
     output = file(p_output, 'w')
     writer = csv.writer(output)
 
-    writer.writerow(['pid', 'name', 'residency', 'wakeup'])
+    writer.writerow(['Trace Time: ' + "%.2fs" % g_duration])
+    writer.writerow([
+        'pid',
+        'name',
+        'execution times (ms)',
+        'residency (%)',
+        'wakeup times',
+        'wakeup (/s)'
+    ])
     for thread in thread_sched:
         # skip idle thread
         if thread['pid'] == '0':
             continue
 
-        writer.writerow(
-            [thread['pid'], thread['name'], thread['residency'], thread['wakeup']])
-
+        writer.writerow([
+            thread['pid'],
+            thread['name'],
+            "%.3f" % float(thread['residency'] / 1000.0),
+            "%.2f" % float(thread['residency'] / g_duration / 10000.0),
+            "%.2f" % float(thread['wakeup']),
+            "%.2f" % float(thread['wakeup'] / g_duration),
+        ])
     output.close()
 
     print '*' * 10
