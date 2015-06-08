@@ -27,6 +27,9 @@
 #include <time.h>
 #include <zlib.h>
 
+#include <string.h>
+
+#if 0
 #include <binder/IBinder.h>
 #include <binder/IServiceManager.h>
 #include <binder/Parcel.h>
@@ -37,6 +40,41 @@
 #include <utils/Trace.h>
 
 using namespace android;
+#endif
+
+#define ATRACE_TAG_NEVER            0       // This tag is never enabled.
+#define ATRACE_TAG_ALWAYS           (1<<0)  // This tag is always enabled.
+#define ATRACE_TAG_GRAPHICS         (1<<1)
+#define ATRACE_TAG_INPUT            (1<<2)
+#define ATRACE_TAG_VIEW             (1<<3)
+#define ATRACE_TAG_WEBVIEW          (1<<4)
+#define ATRACE_TAG_WINDOW_MANAGER   (1<<5)
+#define ATRACE_TAG_ACTIVITY_MANAGER (1<<6)
+#define ATRACE_TAG_SYNC_MANAGER     (1<<7)
+#define ATRACE_TAG_AUDIO            (1<<8)
+#define ATRACE_TAG_VIDEO            (1<<9)
+#define ATRACE_TAG_CAMERA           (1<<10)
+#define ATRACE_TAG_HAL              (1<<11)
+#define ATRACE_TAG_APP              (1<<12)
+#define ATRACE_TAG_RESOURCES        (1<<13)
+#define ATRACE_TAG_DALVIK           (1<<14)
+#define ATRACE_TAG_RS               (1<<15)
+#define ATRACE_TAG_BIONIC           (1<<16)
+#define ATRACE_TAG_POWER            (1<<17)
+#define ATRACE_TAG_LAST             ATRACE_TAG_POWER
+
+// Reserved for initialization.
+#define ATRACE_TAG_NOT_READY        (1LL<<63)
+
+#define ATRACE_TAG_VALID_MASK ((ATRACE_TAG_LAST - 1) | ATRACE_TAG_LAST)
+
+#ifndef ATRACE_TAG
+#define ATRACE_TAG ATRACE_TAG_NEVER
+#elif ATRACE_TAG > ATRACE_TAG_VALID_MASK
+#error ATRACE_TAG must be defined to be one of the tags defined in cutils/trace.h
+#endif
+
+
 
 #define NELEM(x) ((int) (sizeof(x) / sizeof((x)[0])))
 
@@ -97,7 +135,7 @@ static const TracingCategory k_categories[] = {
     } },
     { "freq",       "CPU Frequency",    0, {
         { REQ,      "/sys/kernel/debug/tracing/events/power/cpu_frequency/enable" },
-        { OPT,      "/sys/kernel/debug/tracing/events/power/clock_set_rate/enable" },
+        //{ OPT,      "/sys/kernel/debug/tracing/events/power/clock_set_rate/enable" },
     } },
     { "membus",     "Memory Bus Utilization", 0, {
         { REQ,      "/sys/kernel/debug/tracing/events/memory_bus/enable" },
@@ -149,7 +187,36 @@ static const char* g_debugAppCmdLine = "";
 
 /* Global state */
 static bool g_traceAborted = false;
-static bool g_categoryEnables[NELEM(k_categories)] = {};
+static bool g_categoryEnables[NELEM(k_categories)] = {
+    false, //{ "gfx",        "Graphics",         ATRACE_TAG_GRAPHICS, { } },
+    false, //{ "input",      "Input",            ATRACE_TAG_INPUT, { } },
+    false, //{ "view",       "View System",      ATRACE_TAG_VIEW, { } },
+    false, //{ "webview",    "WebView",          ATRACE_TAG_WEBVIEW, { } },
+    false, //{ "wm",         "Window Manager",   ATRACE_TAG_WINDOW_MANAGER, { } },
+    false, //{ "am",         "Activity Manager", ATRACE_TAG_ACTIVITY_MANAGER, { } },
+    false, //{ "sm",         "Sync Manager",     ATRACE_TAG_SYNC_MANAGER, { } },
+    false, //{ "audio",      "Audio",            ATRACE_TAG_AUDIO, { } },
+    false, //{ "video",      "Video",            ATRACE_TAG_VIDEO, { } },
+    false, //{ "camera",     "Camera",           ATRACE_TAG_CAMERA, { } },
+    false, //{ "hal",        "Hardware Modules", ATRACE_TAG_HAL, { } },
+    false, //{ "app",        "Application",      ATRACE_TAG_APP, { } },
+    false, //{ "res",        "Resource Loading", ATRACE_TAG_RESOURCES, { } },
+    false, //{ "dalvik",     "Dalvik VM",        ATRACE_TAG_DALVIK, { } },
+    false, //{ "rs",         "RenderScript",     ATRACE_TAG_RS, { } },
+    false, //{ "bionic",     "Bionic C Library", ATRACE_TAG_BIONIC, { } },
+    false, //{ "power",      "Power Management", ATRACE_TAG_POWER, { } },
+    true, //{ "sched",      "CPU Scheduling",   0, {
+    true, //{ "irq",        "IRQ Events",   0, {
+    true, //{ "freq",       "CPU Frequency",    0, {
+    true, //{ "membus",     "Memory Bus Utilization", 0, {
+    false, //{ "idle",       "CPU Idle",         0, {
+    true, //{ "disk",       "Disk I/O",         0, {
+    true, //{ "mmc",        "eMMC commands",    0, {
+    false, //{ "load",       "CPU Load",         0, {
+    true, //{ "sync",       "Synchronization",  0, {
+    true, //{ "workq",      "Kernel Workqueues", 0, {
+    true, //{ "memreclaim", "Kernel Memory Reclaim", 0, {
+};
 
 /* Sys file paths */
 static const char* k_traceClockPath =
@@ -225,7 +292,8 @@ static bool _writeStr(const char* filename, const char* str, int flags)
     if (fd == -1) {
         fprintf(stderr, "error opening %s: %s (%d)\n", filename,
                 strerror(errno), errno);
-        return false;
+        //return false;
+        return true;
     }
 
     bool ok = true;
@@ -238,7 +306,8 @@ static bool _writeStr(const char* filename, const char* str, int flags)
 
     close(fd);
 
-    return ok;
+    //return ok;
+	return true;
 }
 
 // Write a string to a file, returning true if the write was successful.
@@ -405,6 +474,7 @@ static bool setPrintTgidEnableIfPresent(bool enable)
 // their system properties.
 static bool pokeBinderServices()
 {
+#if 0
     sp<IServiceManager> sm = defaultServiceManager();
     Vector<String16> services = sm->listServices();
     for (size_t i = 0; i < services.size(); i++) {
@@ -426,12 +496,16 @@ static bool pokeBinderServices()
         }
     }
     return true;
+#else
+    return true;
+#endif
 }
 
 // Set the trace tags that userland tracing uses, and poke the running
 // processes to pick up the new value.
 static bool setTagsProperty(uint64_t tags)
 {
+#if 0
     char buf[64];
     snprintf(buf, 64, "%#" PRIx64, tags);
     if (property_set(k_traceTagsProperty, buf) < 0) {
@@ -439,17 +513,24 @@ static bool setTagsProperty(uint64_t tags)
         return false;
     }
     return true;
+#else
+    return true;
+#endif
 }
 
 // Set the system property that indicates which apps should perform
 // application-level tracing.
 static bool setAppCmdlineProperty(const char* cmdline)
 {
+#if 0
     if (property_set(k_traceAppCmdlineProperty, cmdline) < 0) {
         fprintf(stderr, "error setting trace app system property\n");
         return false;
     }
     return true;
+#else
+    return true;
+#endif
 }
 
 // Disable all /sys/ enable files.
@@ -471,6 +552,7 @@ static bool disableKernelTraceEvents() {
 // kernel.
 static bool verifyKernelTraceFuncs(const char* funcs)
 {
+#if 0
     int fd = open(k_ftraceFilterPath, O_RDONLY);
     if (fd == -1) {
         fprintf(stderr, "error opening %s: %s (%d)\n", k_ftraceFilterPath,
@@ -508,6 +590,9 @@ static bool verifyKernelTraceFuncs(const char* funcs)
     free(myFuncs);
 
     return ok;
+#endif
+
+	return true;
 }
 
 // Set the comma separated list of functions that the kernel is to trace.
@@ -591,7 +676,7 @@ static bool setUpTrace()
                         ok &= setKernelOptionEnable(path, true);
                     } else if (required) {
                         fprintf(stderr, "error writing file %s\n", path);
-                        ok = false;
+                        //ok = false;
                     }
                 }
             }
