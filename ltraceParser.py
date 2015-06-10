@@ -85,14 +85,25 @@ def main():
         if m:
             # print m.groups()
 
+            tgid = m.group('tgid')
+            if tgid:
+                try:
+                    tgid = int(tgid.strip('( )'))
+                except:
+                    tgid = 0
+
             sched = {}
 
+            sched['tgid'] = tgid
+            sched['process'] = None
             sched['cpu'] = m.group('cpu')
             sched['timestamp'] = m.group('timestamp')
             sched['prev_comm'] = m.group('prev_comm')
-            sched['prev_pid'] = m.group('prev_pid')
+            sched['prev_pid'] = int(m.group('prev_pid'))
             sched['next_comm'] = m.group('next_comm')
-            sched['next_pid'] = m.group('next_pid')
+            sched['next_pid'] = int(m.group('next_pid'))
+
+            # print sched
 
             sched_lists += [sched]
         else:
