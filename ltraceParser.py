@@ -30,7 +30,7 @@ def getProcessName(sched_lists, pid):
         name = event['prev_comm'] if (
             pid == event['prev_pid']) else event['next_comm']
     else:
-        print 'pid(%d) name not found' % pid
+        print('pid(' + pid + ') name not found')
 
     return name
 
@@ -136,9 +136,11 @@ def main():
     g_duration = float(g_duration / 1000000.0)
 
     unmatched_sched = []
-    thread_sched = []
     core_sched = []
+    task_sched = []
+    thread_sched = []
 
+    # thread and core info
     for sched in sched_lists:
         prev_sched = filter(
             lambda x: x['cpu'] == sched['cpu'], unmatched_sched)
@@ -158,7 +160,7 @@ def main():
 
                     thread['residency'] += timestamp2ms(
                         sched['timestamp']) - timestamp2ms(prev_sched['timestamp'])
-                    thread['wakeup'] += 1
+                    thread['wakeups'] += 1
                 else:
 
                     thread = {}
@@ -168,11 +170,11 @@ def main():
                     thread['name'] = sched['prev_comm']
                     thread['residency'] = timestamp2ms(
                         sched['timestamp']) - timestamp2ms(prev_sched['timestamp'])
-                    thread['wakeup'] = 1
+                    thread['wakeups'] = 1
 
                     thread_sched += [thread]
 
-                if thread['pid'] != '0':
+                if thread['pid'] != 0:
 
                     core = filter(
                         lambda x: x['cpu'] == sched['cpu'], core_sched)
@@ -182,7 +184,7 @@ def main():
                         core['execution time'] += timestamp2ms(
                             sched['timestamp']) - timestamp2ms(prev_sched['timestamp'])
 
-                        core['wakeup'] += 1
+                        core['wakeups'] += 1
                     else:
                         core = {}
 
@@ -190,7 +192,7 @@ def main():
                         core['execution time'] = timestamp2ms(
                             sched['timestamp']) - timestamp2ms(prev_sched['timestamp'])
 
-                        core['wakeup'] = 1
+                        core['wakeups'] = 1
 
                         core_sched += [core]
             else:
@@ -201,29 +203,74 @@ def main():
 
         unmatched_sched += [sched]
 
+    # thread and core info
     core_sched.sort(key=operator.itemgetter('cpu'))
 
     allCore = {}
     allCore['cpu'] = 'All'
     allCore['execution time'] = 0
-    allCore['wakeup'] = 0
+    allCore['wakeups'] = 0
 
     for core in core_sched:
         allCore['execution time'] += core['execution time']
-        allCore['wakeup'] += core['wakeup']
+        allCore['wakeups'] += core['wakeups']
 
     core_sched += [allCore]
 
     thread_sched.sort(key=operator.itemgetter(
-        'residency', 'pid', 'name', 'wakeup'), reverse=True)
+        'tgid', 'residency', 'wakeups', 'pid', 'name', 'wakeups'), reverse=True)
+
+    # task info
+    for thread in thread_sched:
+        if thread['pid'] == 0:
+            continue
+
+        task = filter(
+            lambda x: x['tgid'] == thread['tgid'], task_sched)
+
+        if not task:
+            task = {}
+
+            task['tgid'] = thread['tgid']
+            task['process'] = getProcessName(sched_lists, thread['tgid'])
+            task['execution time'] = 0
+            task['wakeups'] = 0
+
+            task['threads'] = []
+
+            task_sched += [task]
+        else:
+            task = task[0]
+
+        task['execution time'] += thread['residency']
+        task['wakeups'] += thread['wakeups']
+
+        threadInTask = filter(
+            lambda x: x['pid'] == thread['pid'], task['threads'])
+
+        if not threadInTask:
+            threadInTask = {}
+
+            threadInTask['pid'] = thread['pid']
+            threadInTask['name'] = thread['name']
+            threadInTask['residencyInTime'] = thread['residency']
+            threadInTask['wakeups'] = thread['wakeups']
+
+            task['threads'] += [threadInTask]
+        else:
+            raise 'what is up!'
+
+    task_sched.sort(key=operator.itemgetter('execution time'), reverse=True)
 
     output = file(p_output, 'w')
     writer = csv.writer(output)
 
-    # title
+    # write title
+    writer.writerow(['-' * 50])
     writer.writerow(['Trace Time: ' + "%.2fs" % g_duration])
+    writer.writerow(['-' * 50])
 
-    # core
+    # write core
     writer.writerow(['-' * 50])
     writer.writerow(['Core Residency/Wakeups Info:'])
     writer.writerow(['-' * 50])
@@ -238,12 +285,47 @@ def main():
         writer.writerow([
             core['cpu'],
             "%.3f" % float(core['execution time'] / 1000.0),
-            "%.2f/s" % float(core['wakeup'] / g_duration),
+            "%.2f/s" % float(core['wakeups'] / g_duration),
             "%.2f" % float(
                 core['execution time'] / g_duration / 10000.0) + '%',
         ])
 
-    # thread
+    # write task
+    writer.writerow([])
+    writer.writerow(['-' * 50])
+    writer.writerow(['Process/Thread Residency/Wakups Info:'])
+    writer.writerow(['-' * 50])
+    writer.writerow([
+        'Tgid',
+        'Process',
+        'Pid',
+        'Thread',
+        'Execution Times (ms)',
+        'Wakeup (/s)'
+    ])
+    writer.writerow(['-' * 50])
+
+    for task in task_sched:
+        writer.writerow([
+            task['tgid'],
+            task['process'],
+            None,
+            None,
+            task['execution time'],
+            task['wakeups'],
+        ])
+
+        for threadInTask in task['threads']:
+            writer.writerow([
+                None,
+                None,
+                threadInTask['pid'],
+                threadInTask['name'],
+                threadInTask['residencyInTime'],
+                threadInTask['wakeups'],
+            ])
+
+    # write thread
     writer.writerow([])
     writer.writerow(['-' * 50])
     writer.writerow(['Process/Thread Residency/Wakups Info:'])
@@ -261,7 +343,7 @@ def main():
     writer.writerow(['-' * 50])
     for thread in thread_sched:
         # skip idle thread
-        if thread['pid'] == '0':
+        if thread['pid'] == 0:
             continue
 
         writer.writerow([
@@ -271,8 +353,8 @@ def main():
             thread['name'],
             "%.3f" % float(thread['residency'] / 1000.0),
             "%.2f" % float(thread['residency'] / g_duration / 10000.0) + '%',
-            "%.2f" % float(thread['wakeup']),
-            "%.2f" % float(thread['wakeup'] / g_duration) + '/s',
+            "%.2f" % float(thread['wakeups']),
+            "%.2f" % float(thread['wakeups'] / g_duration) + '/s',
         ])
     output.close()
 
