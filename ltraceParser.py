@@ -80,10 +80,10 @@ def main():
 
     for line in traceFile:
         m = re.match(
-            ".*\s+\[(?P<cpu>\d+)\].*\s+(?P<timestamp>\d+\.\d+):\s+sched_switch:\s+prev_comm=(?P<prev_comm>\S+)\s+prev_pid=(?P<prev_pid>\d+).*\s+next_comm=(?P<next_comm>\S+)\s+next_pid=(?P<next_pid>\d+).*", line)
+            ".*\s+(?P<tgid>\(.+\)|)\s+\[(?P<cpu>\d+)\].*\s+(?P<timestamp>\d+\.\d+):\s+sched_switch:\s+prev_comm=(?P<prev_comm>.+)\s+prev_pid=(?P<prev_pid>\d+).*\s+next_comm=(?P<next_comm>.+)\s+next_pid=(?P<next_pid>\d+).*", line)
 
         if m:
-            # print m.groups
+            # print m.groups()
 
             sched = {}
 
@@ -95,14 +95,15 @@ def main():
             sched['next_pid'] = m.group('next_pid')
 
             sched_lists += [sched]
+        else:
+            if re.search('sched_switch:', line):
+                raise Exception(
+                    'Fatal error, event not matched!' + '\n' + line)
 
     traceFile.close()
 
     if not sched_lists:
-        print '*' * 10
-        print 'Error:', 'Empty trace'
-        print '*' * 10
-        sys.exit(1)
+        raise Exception('Error: empty trace')
 
     g_duration = timestamp2ms(sched_lists[-1]['timestamp']) - timestamp2ms(
         sched_lists[0]['timestamp'])
@@ -117,8 +118,7 @@ def main():
             lambda x: x['cpu'] == sched['cpu'], unmatched_sched)
 
         if len(prev_sched) > 1:
-            print 'error!'
-            sys.exit(1)
+            raise Exception('More than 1 sched on this cpu!')
 
         if prev_sched:
             prev_sched = prev_sched[0]
@@ -167,8 +167,8 @@ def main():
 
                         core_sched += [core]
             else:
-                print 'error!'
-                sys.exit(1)
+                raise Exception(
+                    'Fatal error, pid not match' + '\n' + prev_sched + '\n' + sched)
 
             unmatched_sched.remove(prev_sched)
 
