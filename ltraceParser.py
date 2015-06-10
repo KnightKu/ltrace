@@ -20,6 +20,21 @@ def timestamp2ms(timestamp):
     return (int(tmp[0]) * 1000000 + int(tmp[1]))
 
 
+def getProcessName(sched_lists, pid):
+    name = None
+
+    event = next(
+        (x for x in sched_lists if (x['prev_pid'] == pid or x['next_pid'] == pid)), None)
+
+    if event:
+        name = event['prev_comm'] if (
+            pid == event['prev_pid']) else event['next_comm']
+    else:
+        print 'pid(%d) name not found' % pid
+
+    return name
+
+
 def PrintUsage():
     print ""
     print "  Usage: " + sys.argv[0]
@@ -148,6 +163,7 @@ def main():
 
                     thread = {}
 
+                    thread['tgid'] = sched['tgid']
                     thread['pid'] = sched['prev_pid']
                     thread['name'] = sched['prev_comm']
                     thread['residency'] = timestamp2ms(
@@ -233,6 +249,8 @@ def main():
     writer.writerow(['Process/Thread Residency/Wakups Info:'])
     writer.writerow(['-' * 50])
     writer.writerow([
+        'Tgid',
+        'Process',
         'Pid',
         'Thread',
         'Execution Times (ms)',
@@ -247,6 +265,8 @@ def main():
             continue
 
         writer.writerow([
+            thread['tgid'],
+            getProcessName(sched_lists, thread['tgid']),
             thread['pid'],
             thread['name'],
             "%.3f" % float(thread['residency'] / 1000.0),
