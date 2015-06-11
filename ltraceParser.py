@@ -45,7 +45,7 @@ def PrintUsage():
     print "      -h"
     print "          help"
     print "      -o"
-    print "          output, default is result.csv"
+    print "          output, default is default.csv"
     print "      -f"
     print "          force overwrite output"
     print ""
@@ -66,7 +66,7 @@ def main():
 
     g_tgid_supported = False
 
-    p_output = 'result.csv'
+    p_output = None
     p_input = None
     p_force_write = False
     for option, value in options:
@@ -89,6 +89,9 @@ def main():
         print '*' * 10
         PrintUsage()
 
+    if not p_output:
+        p_output = os.path.basename(p_input) + '.csv'
+
     if (not p_force_write) and os.path.isfile(p_output):
         print '*' * 10
         print 'Error:', 'Output file existed,', p_output
@@ -101,7 +104,7 @@ def main():
 
     for line in traceFile:
         m = re.match(
-            ".*\s+(?P<tgid>\(.+\)|)\s+\[(?P<cpu>\d+)\].*\s+(?P<timestamp>\d+\.\d+):\s+sched_switch:\s+prev_comm=(?P<prev_comm>.+)\s+prev_pid=(?P<prev_pid>\d+).*\s+next_comm=(?P<next_comm>.+)\s+next_pid=(?P<next_pid>\d+).*", line)
+            ".*(?P<tgid>\(.+\)|)\s+\[(?P<cpu>\d+)\].*\s+(?P<timestamp>\d+\.\d+):\s+sched_switch:\s+prev_comm=(?P<prev_comm>.+)\s+prev_pid=(?P<prev_pid>\d+).*\s+next_comm=(?P<next_comm>.+)\s+next_pid=(?P<next_pid>\d+).*", line)
 
         if m:
             # print m.groups()

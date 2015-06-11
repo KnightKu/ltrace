@@ -75,6 +75,8 @@ main()
 	sudo ./ltrace/ltrace -t 10 -z > tmp.zip
 	python systrace.py --from-file=tmp.zip -o $1
 
+	./ltrace/ltraceParser.py -f $1
+
 	#setDrmTracingMark 0
 	#setTracing 0
 }
