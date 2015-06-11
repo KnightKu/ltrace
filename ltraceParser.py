@@ -74,7 +74,7 @@ def main():
             PrintUsage()
         elif option == "-o":
             p_output = value
-        if option == "-f":
+        elif option == "-f":
             p_force_write = True
         else:
             PrintUsage()
